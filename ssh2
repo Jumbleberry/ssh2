@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import subprocess, json, os
+import subprocess, json, os, ConfigParser
 from optparse import OptionParser
 
 usage = "usage: %prog [options] [server_number]\n\
@@ -26,6 +26,7 @@ if not os.path.exists(cache_dir):
   os.makedirs(cache_dir)
 cache_file_list = os.path.join(cache_dir, 'ssh2_list')
 cache_file_num = os.path.join(cache_dir, 'ssh2_num')
+aws_credentials_dir = os.path.join(os.path.expanduser('~'), '.aws/credentials')
 
 num = ''
 if args:
@@ -44,22 +45,36 @@ def extract_name(instance):
 
 if options.bust_cache or not os.path.exists(cache_file_list) \
   or options.profile:
-
+  reservations = {"Reservations": []}
+  
+  if options.profile:
+    profiles = [options.profile]
+  elif os.path.exists(aws_credentials_dir):
+    settings = ConfigParser.ConfigParser()
+    settings.read(aws_credentials_dir);
+    profiles = settings.sections()
+  else: 
+    profiles = ['']
+  
   print "Fetching servers..."
   aws_cmd = 'aws ec2 describe-instances'
-  if options.profile:
-    aws_cmd += ' --profile ' + options.profile
-
-  child = subprocess.Popen(aws_cmd,
-    shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  output = child.stdout.read()
-  error = child.stderr.read()
-  if error:
-    print error
-    print 'Unable to fetch any servers.'
-    exit()
+  
+  for profile in profiles:
+    list_cmd = aws_cmd
+    if (len(profile)):
+      list_cmd += ' --profile ' + profile
+    
+    child = subprocess.Popen(list_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output = child.stdout.read()
+    error = child.stderr.read()
+    if error:
+      print error
+      print 'Unable to fetch any servers.'
+      exit()
+    reservations["Reservations"] += json.loads(output)["Reservations"]
+    
   with open(cache_file_list, 'w') as f:
-    f.write(output)
+    f.write(json.dumps(reservations))
 
 output = open(cache_file_list).read()
 parsed = json.loads(output)
