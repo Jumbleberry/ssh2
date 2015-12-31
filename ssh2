@@ -82,7 +82,9 @@ parsed = json.loads(output)
 all_instances = []
 for instances in parsed['Reservations']:
   for instance in instances['Instances']:
-    all_instances.append(instance)
+    if len(instance['PublicDnsName']):
+        all_instances.append(instance)
+all_instances.sort(key=extract_name);
 
 if not num:
   print "\nServers list:\n"
