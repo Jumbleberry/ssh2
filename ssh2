@@ -118,7 +118,7 @@ with open(cache_file_num, 'w') as f:
 
 instance = all_instances[num - 1]
 dns = instance['PublicDnsName']
-key = instance['KeyName']
+key = instance['KeyName'] if 'KeyName' in instance else ''
 
 identity = ''
 if options.identity and os.path.exists(options.identity):
@@ -126,5 +126,5 @@ if options.identity and os.path.exists(options.identity):
 elif (len(key)):
   identity = "-i ~/.ssh/%s.pem " % key 
 
-print "\nConnecting to", extract_name(instance), dns
+print "\nConnecting to", extract_name(instance), dns, 'using "' + 'ssh %s%s@%s' % (identity, options.user, dns) + '"'
 os.system('ssh %s%s@%s' % (identity, options.user, dns))
