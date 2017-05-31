@@ -53,9 +53,21 @@ def extract_name(instance):
         return tag['Value']
   return '.'
 
+def extract_siblings(instance, all_instances):
+    siblings = []
+    i = 0
+    for profile in all_instances:
+        i += 1
+        if profile != instance and instance['Profile'] == profile['Profile']:
+            choice = '[%d]' % i
+            name = extract_name(profile)
+            siblings.append('"%-4s %-55s %-20s %-30s"' % (choice, profile.get('PrivateIpAddress', False) or profile.get('PrivateDnsName', False), profile['Profile'], name))
+    return siblings
+
+
 if options.bust_cache or not os.path.exists(cache_file_list) \
   or options.profile:
-  reservations = {"Reservations": []}
+  reservations = {"Reservations": {}}
   
   if options.profile:
     profiles = [options.profile]
@@ -101,7 +113,7 @@ if not num:
   for i, instance in enumerate(all_instances, 1):
     choice = '[%d]' % i
     name = extract_name(instance)
-    print '%-4s %-55s %-20s %-30s' % (choice, instance['PublicDnsName'] or instance['PrivateDnsName'], instance['Profile'], name)
+    print '%-4s %-55s %-20s %-30s' % (choice, instance.get('PublicIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False), instance['Profile'], name)
 
 default_num = 1
 if os.path.exists(cache_file_num):
@@ -168,5 +180,59 @@ for filename in os.listdir(directory):
   if "-----BEGIN RSA PRIVATE KEY-----" in contents:
     os.system('ssh-add %s > /dev/null 2>&1' % os.path.join(directory, filename))
 
-print "\nConnecting to", extract_name(instance), 'using "' + 'ssh %s%s@%s' % (identity, options.user, dns) + '"'
+# Generate ssh helper files
+
+ssh_hop = """#!/bin/bash
+offset=1
+
+declare -a arr=(
+    """ + "\n".join(extract_siblings(instance, all_instances)) + """
+)
+for i in "${arr[@]}"
+do
+   echo "$i"
+done
+
+selection="none"
+while ! [[ $selection =~ ^[0-9]+$ ]] || (($selection >= ${#arr[@]}))
+do
+    printf "\nWhich server would you like to connect to? "
+    read choice
+    for i in "${!arr[@]}"
+    do
+        val=$(echo "${arr[$i]}" | grep "^\[$choice\]" > /dev/null 2>&1)
+        if [[ $? == 0 ]]; then
+            selection=$i
+            break
+        fi
+    done
+done
+
+host="$(echo ${arr[$selection]} | awk '{print $2}')"
+/bin/bash -c "ssh """ + options.user + """@$host"
+"""
+
+scp_ssh2 = os.path.join(cache_dir, 'ssh2')
+with open(scp_ssh2, 'w') as f:
+    f.write(ssh_hop)
+
+ssh_connect = 'ssh -A -K %s%s@%s' % (identity, options.user, dns)
+print "\nConnecting to", extract_name(instance), 'using "' + ssh_connect + '"'
+
+# Attempt to connect
+try:
+  code = 0
+  output = subprocess.check_output(ssh_connect + " exit", shell=True)
+except (subprocess.CalledProcessError) as e:
+  code = e.returncode
+
+# If connected, add ssh2 helper files
+if code == 0:
+    # Add $HOME to $PATH
+    os.system(ssh_connect + " 'grep -q -F \"export PATH=\\\"$PATH:$HOME\\\"\" \"$HOME/.profile\" || echo \"export PATH=\\\"$PATH:$HOME\\\"\"  >>  \"$HOME/.profile\"'")
+    # Add ssh2 sibling file to hop to linked machines
+    os.system('scp -o \"ForwardAgent=yes\"  %s %s@%s:~/ssh2 > /dev/null 2>&1' % (scp_ssh2, options.user, dns))
+    # update file permissions
+    os.system(ssh_connect + " 'chmod 744 ~/ssh2' > /dev/null 2>&1")
+
 os.system('ssh -A -K %s%s@%s' % (identity, options.user, dns))
