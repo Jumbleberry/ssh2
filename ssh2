@@ -127,7 +127,10 @@ with open(cache_file_num, 'w') as f:
   f.write(str(num))
 
 instance = all_instances[num - 1]
-dns = [instance['PublicDnsName'] or instance['PublicIpAddress'] or instance['PrivateDnsName'] or instance['PrivateIpAddress'], instance['PublicIpAddress'] or instance['PrivateIpAddress']][options.ip]
+dns = [
+        instance.get('PublicDnsName', False) or instance.get('PublicIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False), 
+        instance.get('PublicIpAddress', False) or instance.get('PrivateIpAddress', False)
+    ][options.ip]
 key = instance['KeyName'] if 'KeyName' in instance else ''
 
 print options.user
@@ -158,5 +161,12 @@ if options.identity and os.path.exists(options.identity):
 elif (len(key)):
   identity = "-i ~/.ssh/%s.pem " % key 
 
-print "\nConnecting to", extract_name(instance), dns, 'using "' + 'ssh %s%s@%s' % (identity, options.user, dns) + '"'
+# Add all private keys to ssh-client
+directory = os.path.join(os.path.expanduser('~'), '.ssh')
+for filename in os.listdir(directory):
+  contents = open(os.path.join(directory, filename)).read()
+  if "-----BEGIN RSA PRIVATE KEY-----" in contents:
+    os.system('ssh-add %s > /dev/null 2>&1' % os.path.join(directory, filename))
+
+print "\nConnecting to", extract_name(instance), 'using "' + 'ssh %s%s@%s' % (identity, options.user, dns) + '"'
 os.system('ssh -A -K %s%s@%s' % (identity, options.user, dns))
