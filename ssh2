@@ -10,22 +10,32 @@ parser = OptionParser(usage)
 parser.add_option("-x", "--bust-cache", action="store_true",
     help="refetch servers list from AWS")
 parser.add_option("-u", "--user", action="store",
-          dest="user", default="ubuntu",
+          dest="user", default="",
     help="provide user (default: ubuntu)")
 parser.add_option("-i", "--identity", action="store",
           dest="identity", default="",
     help="provide identity file")
 parser.add_option("-p", "--profile", action="store",
           dest="profile", default="",
-    help="provide aws profile")
+    help="provide AWS profile")
+parser.add_option("-r", "--region", action="store",
+          dest="region", default="",
+    help="provide AWS region")
+parser.add_option("--ip", action="store",
+          dest="ip", default=0,
+    help="connect using IP instead of DNS")
 (options, args) = parser.parse_args()
 
 cache_dir = os.environ.get('XDG_CACHE_HOME',
   os.path.join(os.path.expanduser('~'), '.cache'))
 if not os.path.exists(cache_dir):
   os.makedirs(cache_dir)
-cache_file_list = os.path.join(cache_dir, 'ssh2_list')
-cache_file_num = os.path.join(cache_dir, 'ssh2_num')
+if options.region:
+  cache_file_list = os.path.join(cache_dir, 'ssh2_list_' + options.region)
+  cache_file_num = os.path.join(cache_dir, 'ssh2_num_' + options.region)
+else:
+  cache_file_list = os.path.join(cache_dir, 'ssh2_list')
+  cache_file_num = os.path.join(cache_dir, 'ssh2_num')
 aws_credentials_dir = os.path.join(os.path.expanduser('~'), '.aws/credentials')
 
 num = ''
@@ -57,8 +67,7 @@ if options.bust_cache or not os.path.exists(cache_file_list) \
     profiles = ['']
   
   print "Fetching servers..."
-  aws_cmd = 'aws ec2 describe-instances'
-  
+  aws_cmd = 'aws ec2 describe-instances --filters Name=instance-state-name,Values=running '
   for profile in profiles:
     list_cmd = aws_cmd
     if (len(profile)):
@@ -71,7 +80,7 @@ if options.bust_cache or not os.path.exists(cache_file_list) \
       print error
       print 'Unable to fetch any servers.'
       exit()
-    reservations["Reservations"] += json.loads(output)["Reservations"]
+    reservations["Reservations"][profile] = json.loads(output)["Reservations"]
     
   with open(cache_file_list, 'w') as f:
     f.write(json.dumps(reservations))
@@ -80,18 +89,19 @@ output = open(cache_file_list).read()
 parsed = json.loads(output)
 
 all_instances = []
-for instances in parsed['Reservations']:
-  for instance in instances['Instances']:
-    if len(instance['PublicDnsName']):
-        all_instances.append(instance)
-all_instances.sort(key=extract_name);
+for profile in parsed['Reservations']:
+  for instances in parsed['Reservations'][profile]:
+    for instance in instances['Instances']:
+      if len(instance['PublicDnsName']) or extract_name(instance) != '.':
+        all_instances.append(dict(instance.items() + {'Profile': profile}.items()))
+all_instances = sorted(all_instances, key=lambda x: (x['Profile'], extract_name));
 
 if not num:
   print "\nServers list:\n"
   for i, instance in enumerate(all_instances, 1):
     choice = '[%d]' % i
     name = extract_name(instance)
-    print '%-4s %-55s %-30s' % (choice, instance['PublicDnsName'], name)
+    print '%-4s %-55s %-20s %-30s' % (choice, instance['PublicDnsName'] or instance['PrivateDnsName'], instance['Profile'], name)
 
 default_num = 1
 if os.path.exists(cache_file_num):
@@ -117,8 +127,30 @@ with open(cache_file_num, 'w') as f:
   f.write(str(num))
 
 instance = all_instances[num - 1]
-dns = instance['PublicDnsName']
+dns = [instance['PublicDnsName'] or instance['PublicIpAddress'] or instance['PrivateDnsName'] or instance['PrivateIpAddress'], instance['PublicIpAddress'] or instance['PrivateIpAddress']][options.ip]
 key = instance['KeyName'] if 'KeyName' in instance else ''
+
+print options.user
+cache_file_user = os.path.join(cache_dir, 'ssh2_user_' + dns)
+default_user = 'ubuntu'
+if os.path.exists(cache_file_user):
+  default_user = open(cache_file_user).read()
+ok = not not default_user
+while not ok or not options.user:
+  try:
+    options.user = raw_input("Which username would you like to connect with [" +
+            str(default_user) + "]? ")
+    if not options.user:
+      options.user = default_user
+      break
+    ok = not not options.user
+    if ok:
+      break
+  except (EOFError, KeyboardInterrupt) as e:
+    print "\nExiting..."
+    exit()
+with open(cache_file_user, 'w') as f:
+  f.write(str(options.user))
 
 identity = ''
 if options.identity and os.path.exists(options.identity):
@@ -127,4 +159,4 @@ elif (len(key)):
   identity = "-i ~/.ssh/%s.pem " % key 
 
 print "\nConnecting to", extract_name(instance), dns, 'using "' + 'ssh %s%s@%s' % (identity, options.user, dns) + '"'
-os.system('ssh %s%s@%s' % (identity, options.user, dns))
+os.system('ssh -A -K %s%s@%s' % (identity, options.user, dns))
