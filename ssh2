@@ -145,6 +145,48 @@ dns = [
     ][options.ip]
 key = instance['KeyName'] if 'KeyName' in instance else ''
 
+identity = ''
+if options.identity and os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh', options.identity)):
+  identity = "%s" % options.identity
+elif (len(key)):
+  identity = "%s.pem" % key 
+
+identities = []
+cache_file_identity = os.path.join(cache_dir, 'ssh2_identity_' + dns)
+default_identity = identity or 'production.pem'
+if os.path.exists(cache_file_identity):
+  default_identity = open(cache_file_identity).read()
+print "\nKeys list:\n"
+# Determine which identity to use
+j = 1
+directory = os.path.join(os.path.expanduser('~'), '.ssh')
+for filename in os.listdir(directory):
+  contents = open(os.path.join(directory, filename)).read()
+  if "-----BEGIN RSA PRIVATE KEY-----" in contents:
+    index = '[%s]' % j
+    print '%-4s %s' % (index, filename)
+    identities.append(filename)
+    j += 1
+
+ok = False
+while not ok:
+  try:
+    num = raw_input("\nWhich identity would you like to connect with [" + str(default_identity) + "]? ")
+    if not num:
+      identity = '-i ~/.ssh/' + default_identity
+      break
+    ok = num.isdigit() and 1 <= int(num) <= j
+    if ok:
+      identity = '-i ~/.ssh/' + identities[int(num)-1]
+      break
+    print "ERR: please enter a value between 1 and " + str(i)
+  except (EOFError, KeyboardInterrupt) as e:
+    print "\nExiting..."
+    exit()
+
+with open(cache_file_identity, 'w') as f:
+  f.write(str(identity)[10:])
+
 print options.user
 cache_file_user = os.path.join(cache_dir, 'ssh2_user_' + dns)
 default_user = 'ubuntu'
@@ -166,19 +208,6 @@ while not ok or not options.user:
     exit()
 with open(cache_file_user, 'w') as f:
   f.write(str(options.user))
-
-identity = ''
-if options.identity and os.path.exists(options.identity):
-  identity = "-i %s " % options.identity
-elif (len(key)):
-  identity = "-i ~/.ssh/%s.pem " % key 
-
-# Add all private keys to ssh-client
-directory = os.path.join(os.path.expanduser('~'), '.ssh')
-for filename in os.listdir(directory):
-  contents = open(os.path.join(directory, filename)).read()
-  if "-----BEGIN RSA PRIVATE KEY-----" in contents:
-    os.system('ssh-add %s > /dev/null 2>&1' % os.path.join(directory, filename))
 
 # Generate ssh helper files
 
@@ -209,15 +238,19 @@ do
 done
 
 host="$(echo ${arr[$selection]} | awk '{print $2}')"
-/bin/bash -c "ssh """ + options.user + """@$host"
+/bin/bash -c "ssh -o ForwardAgent=yes """ + options.user + """@$host"
 """
 
 scp_ssh2 = os.path.join(cache_dir, 'ssh2')
 with open(scp_ssh2, 'w') as f:
     f.write(ssh_hop)
 
-ssh_connect = 'ssh -A -K %s%s@%s' % (identity, options.user, dns)
-print "\nConnecting to", extract_name(instance), 'using "' + ssh_connect + '"'
+disablePublic = ''
+if identity:
+    disablePublic = ' -o IdentitiesOnly=yes -o ForwardAgent=yes '
+
+ssh_connect = 'ssh -K %s%s%s@%s' % (identity, disablePublic, options.user, dns)
+print "\nConnecting to", extract_name(instance), 'using: \n' + ssh_connect + '\n'
 
 # Attempt to connect
 try:
@@ -228,11 +261,14 @@ except (subprocess.CalledProcessError) as e:
 
 # If connected, add ssh2 helper files
 if code == 0:
+    # Add key 
+    os.system('ssh-add ' + identity[3:] + ' > /dev/null 2>&1')
     # Add $HOME to $PATH
     os.system(ssh_connect + " 'grep -q -F \"export PATH=\\\"$PATH:$HOME\\\"\" \"$HOME/.profile\" || echo \"export PATH=\\\"$PATH:$HOME\\\"\"  >>  \"$HOME/.profile\"'")
     # Add ssh2 sibling file to hop to linked machines
-    os.system('scp -o \"ForwardAgent=yes\"  %s %s@%s:~/ssh2 > /dev/null 2>&1' % (scp_ssh2, options.user, dns))
+    os.system('scp %s %s %s %s@%s:~/ssh2 > /dev/null 2>&1' % (disablePublic, identity, scp_ssh2, options.user, dns))
     # update file permissions
     os.system(ssh_connect + " 'chmod 744 ~/ssh2' > /dev/null 2>&1")
 
-os.system('ssh -A -K %s%s@%s' % (identity, options.user, dns))
+os.system(ssh_connect)
+os.system('ssh-add -d ' + identity[3:] + ' > /dev/null 2>&1')
