@@ -106,7 +106,7 @@ for profile in parsed['Reservations']:
     for instance in instances['Instances']:
       if len(instance['PublicDnsName']) or extract_name(instance) != '.':
         all_instances.append(dict(instance.items() + {'Profile': profile}.items()))
-all_instances = sorted(all_instances, key=lambda x: (x['Profile'], extract_name));
+all_instances = sorted(all_instances, key=lambda x: (x['Profile'], extract_name(x)));
 
 if not num:
   print "\nServers list:\n"
