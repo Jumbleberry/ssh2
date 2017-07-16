@@ -266,7 +266,7 @@ if code == 0:
     # Add ssh2 sibling file to hop to linked machines
     os.system('scp %s %s %s %s@%s:~/ssh2 > /dev/null 2>&1' % (disablePublic, identity, scp_ssh2, options.user, dns))
     # Add $HOME to $PATH & update file permissions
-    os.system(ssh_connect + " 'grep -q -F \"export PATH=\\\"$PATH:$HOME\\\"\" \"$HOME/.profile\" || echo \"export PATH=\\\"$PATH:$HOME\\\"\"  >>  \"$HOME/.profile\"; chmod 744 ~/ssh2' > dev/null 2>&1")
+    os.system(ssh_connect + " 'grep -q -F \"export PATH=\\\"$PATH:$HOME\\\"\" \"$HOME/.profile\" || echo \"export PATH=\\\"$PATH:$HOME\\\"\"  >>  \"$HOME/.profile\"; chmod 744 ~/ssh2' > /dev/null 2>&1")
 
     os.system(ssh_connect)
     os.system('ssh-add -d ' + identity[3:] + ' > /dev/null 2>&1')
