@@ -231,7 +231,7 @@ do
     read choice
     for i in "${!arr[@]}"
     do
-        val=$(echo "${arr[$i]}" | grep "^\[$choice\]" > /dev/null 2>&1)
+        val=$(echo "${arr[$i]}" | grep "\\[$choice\\]" > /dev/null 2>&1)
         if [[ $? == 0 ]]; then
             selection=$i
             break
