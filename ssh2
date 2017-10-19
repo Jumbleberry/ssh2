@@ -166,7 +166,7 @@ for filename in os.listdir(directory):
   if "-----BEGIN RSA PRIVATE KEY-----" in contents:
     index = '[%s]' % j
     escape = '\033[38;5;%im\033[48;5;%im' % (0,(192 + (j*6)%36) % 255)
-    print '%s%-4s %-50s\033[0m' % (escape, index, filename)
+    print '%s%-4s %-127s\033[0m' % (escape, index, filename)
     identities.append(filename)
     j += 1
 
