@@ -115,7 +115,7 @@ if not num:
     choice = '[%d]' % i
     name = extract_name(instance)
     escape = '\033[38;5;%im\033[48;5;%im' % (0,(191 + (i*6)%36) % 255)
-    print '%s%-4s %-55s %-20s %-50s\033[0m' % (escape, choice, name, instance['Profile'], instance.get('PublicIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False))
+    print '%s%-4s %-55s %-20s %-50s\033[0m' % (escape, choice, name, instance['Profile'], instance.get('PrivateIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False))
 default_num = 1
 if os.path.exists(cache_file_num):
   default_num = open(cache_file_num).read()
