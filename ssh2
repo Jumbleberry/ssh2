@@ -62,7 +62,7 @@ def extract_siblings(instance, all_instances):
             choice = '[%d]' % i
             name = extract_name(profile)
             escape = '\033[38;5;%im\033[48;5;%im' % (0,(191 + (i*6)%36) % 255)
-            siblings.append('"%s%-4s %-55s %-20s %-50s\033[0m"' % (escape, choice, profile.get('PrivateIpAddress', False) or profile.get('PrivateDnsName', False), profile['Profile'], name))
+            siblings.append('"%s%-4s %-55s %-20s %-50s\033[0m"' % (escape, choice, name, profile['Profile'], instance.get('PublicIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False)))
     return siblings
 
 
