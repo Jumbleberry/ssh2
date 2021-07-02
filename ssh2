@@ -162,13 +162,16 @@ print "\nKeys list:\n"
 j = 1
 directory = os.path.join(os.path.expanduser('~'), '.ssh')
 for filename in os.listdir(directory):
-  contents = open(os.path.join(directory, filename)).read()
-  if "-----BEGIN RSA PRIVATE KEY-----" in contents:
-    index = '[%s]' % j
-    escape = '\033[38;5;%im\033[48;5;%im' % (0,(192 + (j*6)%36) % 255)
-    print '%s%-4s %-127s\033[0m' % (escape, index, filename)
-    identities.append(filename)
-    j += 1
+  try:
+    contents = open(os.path.join(directory, filename)).read()
+    if "-----BEGIN RSA PRIVATE KEY-----" in contents:
+        index = '[%s]' % j
+        escape = '\033[38;5;%im\033[48;5;%im' % (0,(192 + (j*6)%36) % 255)
+        print '%s%-4s %-127s\033[0m' % (escape, index, filename)
+        identities.append(filename)
+        j += 1
+  except:
+    pass
 
 ok = False
 while not ok:
