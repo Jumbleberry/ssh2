@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import subprocess, json, os, ConfigParser
+import subprocess, json, os, configparser
 from optparse import OptionParser
 
 usage = "usage: %prog [options] [server_number]\n\
@@ -41,7 +41,7 @@ aws_credentials_dir = os.path.join(os.path.expanduser('~'), '.aws/credentials')
 num = ''
 if args:
   if not args[0].isdigit():
-    print "'server_number' must be a numeric value"
+    print("'server_number' must be a numeric value")
     exit()
   num = int(args[0])
 
@@ -73,13 +73,13 @@ if options.bust_cache or not os.path.exists(cache_file_list) \
   if options.profile:
     profiles = [options.profile]
   elif os.path.exists(aws_credentials_dir):
-    settings = ConfigParser.ConfigParser()
+    settings = configparser.ConfigParser()
     settings.read(aws_credentials_dir);
     profiles = settings.sections()
   else: 
     profiles = ['']
   
-  print "Fetching servers..."
+  print("Fetching servers...")
   aws_cmd = 'aws ec2 describe-instances --filters Name=instance-state-name,Values=running '
   for profile in profiles:
     list_cmd = aws_cmd
@@ -90,8 +90,8 @@ if options.bust_cache or not os.path.exists(cache_file_list) \
     output = child.stdout.read()
     error = child.stderr.read()
     if error:
-      print error
-      print 'Unable to fetch any servers.'
+      print(error)
+      print('Unable to fetch any servers.')
       exit()
     reservations["Reservations"][profile] = json.loads(output)["Reservations"]
     
@@ -106,23 +106,23 @@ for profile in parsed['Reservations']:
   for instances in parsed['Reservations'][profile]:
     for instance in instances['Instances']:
       if len(instance['PublicDnsName']) or extract_name(instance) != '.':
-        all_instances.append(dict(instance.items() + {'Profile': profile}.items()))
+        all_instances.append(dict(list(instance.items()) + list({'Profile': profile}.items())))
 all_instances = sorted(all_instances, key=lambda x: (x['Profile'], extract_name(x)));
 
 if not num:
-  print "\nServers list:\n"
+  print("\nServers list:\n")
   for i, instance in enumerate(all_instances, 1):
     choice = '[%d]' % i
     name = extract_name(instance)
     escape = '\033[38;5;%im\033[48;5;%im' % (0,(191 + (i*6)%36) % 255)
-    print '%s%-4s %-55s %-20s %-50s\033[0m' % (escape, choice, name, instance['Profile'], instance.get('PrivateIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False))
+    print('%s%-4s %-55s %-20s %-50s\033[0m' % (escape, choice, name, instance['Profile'], instance.get('PrivateIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False)))
 default_num = 1
 if os.path.exists(cache_file_num):
   default_num = open(cache_file_num).read()
 ok = not not num
 while not ok or not num:
   try:
-    num = raw_input("\nWhich server would you like to connect to [" +
+    num = input("\nWhich server would you like to connect to [" +
             str(default_num) + "]? ")
     if not num:
       num = int(default_num)
@@ -131,9 +131,9 @@ while not ok or not num:
     if ok:
       num = int(num)
       break
-    print "ERR: please enter a value between 1 and " + str(i)
+    print("ERR: please enter a value between 1 and " + str(i))
   except (EOFError, KeyboardInterrupt) as e:
-    print "\nExiting..."
+    print("\nExiting...")
     exit()
 
 with open(cache_file_num, 'w') as f:
@@ -157,7 +157,7 @@ cache_file_identity = os.path.join(cache_dir, 'ssh2_identity_' + dns)
 default_identity = identity or 'production.pem'
 if os.path.exists(cache_file_identity):
   default_identity = open(cache_file_identity).read()
-print "\nKeys list:\n"
+print("\nKeys list:\n")
 # Determine which identity to use
 j = 1
 directory = os.path.join(os.path.expanduser('~'), '.ssh')
@@ -167,7 +167,7 @@ for filename in os.listdir(directory):
     if "-----BEGIN RSA PRIVATE KEY-----" in contents:
         index = '[%s]' % j
         escape = '\033[38;5;%im\033[48;5;%im' % (0,(192 + (j*6)%36) % 255)
-        print '%s%-4s %-127s\033[0m' % (escape, index, filename)
+        print('%s%-4s %-127s\033[0m' % (escape, index, filename))
         identities.append(filename)
         j += 1
   except:
@@ -176,7 +176,7 @@ for filename in os.listdir(directory):
 ok = False
 while not ok:
   try:
-    num = raw_input("\nWhich identity would you like to connect with [" + str(default_identity) + "]? ")
+    num = input("\nWhich identity would you like to connect with [" + str(default_identity) + "]? ")
     if not num:
       identity = '-i ~/.ssh/' + default_identity
       break
@@ -184,15 +184,15 @@ while not ok:
     if ok:
       identity = '-i ~/.ssh/' + identities[int(num)-1]
       break
-    print "ERR: please enter a value between 1 and " + str(i)
+    print("ERR: please enter a value between 1 and " + str(i))
   except (EOFError, KeyboardInterrupt) as e:
-    print "\nExiting..."
+    print("\nExiting...")
     exit()
 
 with open(cache_file_identity, 'w') as f:
   f.write(str(identity)[10:])
 
-print options.user
+print(options.user)
 cache_file_user = os.path.join(cache_dir, 'ssh2_user_' + dns)
 default_user = 'ubuntu'
 if os.path.exists(cache_file_user):
@@ -200,7 +200,7 @@ if os.path.exists(cache_file_user):
 ok = not not default_user
 while not ok or not options.user:
   try:
-    options.user = raw_input("Which username would you like to connect with [" +
+    options.user = input("Which username would you like to connect with [" +
             str(default_user) + "]? ")
     if not options.user:
       options.user = default_user
@@ -209,7 +209,7 @@ while not ok or not options.user:
     if ok:
       break
   except (EOFError, KeyboardInterrupt) as e:
-    print "\nExiting..."
+    print("\nExiting...")
     exit()
 with open(cache_file_user, 'w') as f:
   f.write(str(options.user))
@@ -255,7 +255,7 @@ if identity:
     disablePublic = ' -o IdentitiesOnly=yes -o ForwardAgent=yes -o HostKeyAlgorithms=ssh-rsa-cert-v01@openssh.com,ssh-rsa '
 
 ssh_connect = 'ssh -K %s%s%s@%s' % (identity, disablePublic, options.user, dns)
-print "\nConnecting to", extract_name(instance), 'using: \n' + ssh_connect + '\n'
+print("\nConnecting to", extract_name(instance), 'using: \n' + ssh_connect + '\n')
 
 # Attempt to connect
 try:
@@ -276,4 +276,4 @@ if code == 0:
     os.system(ssh_connect)
     os.system('ssh-add -d ' + identity[3:] + ' > /dev/null 2>&1')
 else:
-    print "\nFailed to connect.\n"
+    print("\nFailed to connect.\n")
