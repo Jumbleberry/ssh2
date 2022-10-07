@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-import subprocess, json, os, configparser
+import subprocess
+import json
+import os
+import configparser
 from optparse import OptionParser
 
 usage = "usage: %prog [options] [server_number]\n\
@@ -8,50 +11,51 @@ usage = "usage: %prog [options] [server_number]\n\
 
 parser = OptionParser(usage)
 parser.add_option("-x", "--bust-cache", action="store_true",
-    help="refetch servers list from AWS")
+                  help="refetch servers list from AWS")
 parser.add_option("-u", "--user", action="store",
-          dest="user", default="",
-    help="provide user (default: ubuntu)")
+                  dest="user", default="",
+                  help="provide user (default: ubuntu)")
 parser.add_option("-i", "--identity", action="store",
-          dest="identity", default="",
-    help="provide identity file")
+                  dest="identity", default="",
+                  help="provide identity file")
 parser.add_option("-p", "--profile", action="store",
-          dest="profile", default="",
-    help="provide AWS profile")
+                  dest="profile", default="",
+                  help="provide AWS profile")
 parser.add_option("-r", "--region", action="store",
-          dest="region", default="",
-    help="provide AWS region")
+                  dest="region", default="us-east-1",
+                  help="provide AWS region")
 parser.add_option("--ip", action="store",
-          dest="ip", default=0,
-    help="connect using IP instead of DNS")
+                  dest="ip", default=0,
+                  help="connect using IP instead of DNS")
 (options, args) = parser.parse_args()
 
 cache_dir = os.environ.get('XDG_CACHE_HOME',
-  os.path.join(os.path.expanduser('~'), '.cache'))
+                           os.path.join(os.path.expanduser('~'), '.cache'))
 if not os.path.exists(cache_dir):
-  os.makedirs(cache_dir)
+    os.makedirs(cache_dir)
 if options.region:
-  cache_file_list = os.path.join(cache_dir, 'ssh2_list_' + options.region)
-  cache_file_num = os.path.join(cache_dir, 'ssh2_num_' + options.region)
+    cache_file_list = os.path.join(cache_dir, 'ssh2_list_' + options.region)
+    cache_file_num = os.path.join(cache_dir, 'ssh2_num_' + options.region)
 else:
-  cache_file_list = os.path.join(cache_dir, 'ssh2_list')
-  cache_file_num = os.path.join(cache_dir, 'ssh2_num')
+    cache_file_list = os.path.join(cache_dir, 'ssh2_list')
+    cache_file_num = os.path.join(cache_dir, 'ssh2_num')
 aws_credentials_dir = os.path.join(os.path.expanduser('~'), '.aws/credentials')
 
 num = ''
 if args:
-  if not args[0].isdigit():
-    print("'server_number' must be a numeric value")
-    exit()
-  num = int(args[0])
+    if not args[0].isdigit():
+        print("'server_number' must be a numeric value")
+        exit()
+    num = int(args[0])
 
 
 def extract_name(instance):
-  if 'Tags' in instance:
-    for tag in instance['Tags']:
-      if tag['Key'] == 'Name' and tag['Value']:
-        return tag['Value']
-  return '.'
+    if 'Tags' in instance:
+        for tag in instance['Tags']:
+            if tag['Key'] == 'Name' and tag['Value']:
+                return tag['Value']
+    return '.'
+
 
 def extract_siblings(instance, all_instances):
     siblings = []
@@ -61,158 +65,176 @@ def extract_siblings(instance, all_instances):
         if profile != instance and instance['Profile'] == profile['Profile']:
             choice = '[%d]' % i
             name = extract_name(profile)
-            escape = '\033[38;5;%im\033[48;5;%im' % (0,(191 + (i*6)%36) % 255)
-            siblings.append('"%s%-4s %-55s %-20s %-50s\033[0m"' % (escape, choice, name, profile['Profile'], instance.get('PublicIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False)))
+            escape = '\033[38;5;%im\033[48;5;%im' % (
+                0, (191 + (i*6) % 36) % 255)
+            siblings.append('"%s%-4s %-55s %-20s %-50s\033[0m"' % (escape, choice, name, profile['Profile'], instance.get(
+                'PublicIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False)))
     return siblings
 
 
 if options.bust_cache or not os.path.exists(cache_file_list) \
-  or options.profile:
-  reservations = {"Reservations": {}}
-  
-  if options.profile:
-    profiles = [options.profile]
-  elif os.path.exists(aws_credentials_dir):
-    settings = configparser.ConfigParser()
-    settings.read(aws_credentials_dir);
-    profiles = settings.sections()
-  else: 
-    profiles = ['']
-  
-  print("Fetching servers...")
-  aws_cmd = 'aws ec2 describe-instances --filters Name=instance-state-name,Values=running '
-  for profile in profiles:
-    list_cmd = aws_cmd
-    if (len(profile)):
-      list_cmd += ' --profile ' + profile
-    
-    child = subprocess.Popen(list_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output = child.stdout.read()
-    error = child.stderr.read()
-    if error:
-      print(error)
-      print('Unable to fetch any servers.')
-      exit()
-    reservations["Reservations"][profile] = json.loads(output)["Reservations"]
-    
-  with open(cache_file_list, 'w') as f:
-    f.write(json.dumps(reservations))
+        or options.profile:
+    reservations = {"Reservations": {}}
+
+    if options.profile:
+        profiles = [options.profile]
+    elif os.path.exists(aws_credentials_dir):
+        settings = configparser.ConfigParser()
+        settings.read(aws_credentials_dir)
+        profiles = settings.sections()
+    else:
+        profiles = ['']
+
+    print("Fetching servers...")
+    aws_cmd = 'aws ec2 describe-instances --filters Name=instance-state-name,Values=running '
+    for profile in profiles:
+        list_cmd = aws_cmd
+        if (len(profile)):
+            list_cmd += ' --profile ' + profile
+        child = subprocess.Popen(
+            list_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output = child.stdout.read()
+        error = child.stderr.read()
+        if error:
+          # Account for our default region being us-east-1
+          # Ensure that any missed profiles still have the default region check
+            if error == b'\nYou must specify a region. You can also configure your region by running "aws configure".\n':
+                list_cmd = aws_cmd + ' --region us-east-1' + ' --profile ' + profile
+                child = subprocess.Popen(
+                    list_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = child.stdout.read()
+            else:
+                print(error)
+                print('Unable to fetch any servers.')
+                exit()
+        reservations["Reservations"][profile] = json.loads(output)[
+            "Reservations"]
+
+    with open(cache_file_list, 'w') as f:
+        f.write(json.dumps(reservations))
 
 output = open(cache_file_list).read()
 parsed = json.loads(output)
 
 all_instances = []
 for profile in parsed['Reservations']:
-  for instances in parsed['Reservations'][profile]:
-    for instance in instances['Instances']:
-      if len(instance['PublicDnsName']) or extract_name(instance) != '.':
-        all_instances.append(dict(list(instance.items()) + list({'Profile': profile}.items())))
-all_instances = sorted(all_instances, key=lambda x: (x['Profile'], extract_name(x)));
+    for instances in parsed['Reservations'][profile]:
+        for instance in instances['Instances']:
+            if len(instance['PublicDnsName']) or extract_name(instance) != '.':
+                all_instances.append(
+                    dict(list(instance.items()) + list({'Profile': profile}.items())))
+all_instances = sorted(all_instances, key=lambda x: (
+    x['Profile'], extract_name(x)))
 
 if not num:
-  print("\nServers list:\n")
-  for i, instance in enumerate(all_instances, 1):
-    choice = '[%d]' % i
-    name = extract_name(instance)
-    escape = '\033[38;5;%im\033[48;5;%im' % (0,(191 + (i*6)%36) % 255)
-    print('%s%-4s %-55s %-20s %-50s\033[0m' % (escape, choice, name, instance['Profile'], instance.get('PrivateIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False)))
+    print("\nServers list:\n")
+    for i, instance in enumerate(all_instances, 1):
+        choice = '[%d]' % i
+        name = extract_name(instance)
+        escape = '\033[38;5;%im\033[48;5;%im' % (0, (191 + (i*6) % 36) % 255)
+        print('%s%-4s %-55s %-20s %-50s\033[0m' % (escape, choice, name, instance['Profile'], instance.get(
+            'PrivateIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False)))
 default_num = 1
 if os.path.exists(cache_file_num):
-  default_num = open(cache_file_num).read()
+    default_num = open(cache_file_num).read()
 ok = not not num
 while not ok or not num:
-  try:
-    num = input("\nWhich server would you like to connect to [" +
-            str(default_num) + "]? ")
-    if not num:
-      num = int(default_num)
-      break
-    ok = num.isdigit() and 1 <= int(num) <= i
-    if ok:
-      num = int(num)
-      break
-    print("ERR: please enter a value between 1 and " + str(i))
-  except (EOFError, KeyboardInterrupt) as e:
-    print("\nExiting...")
-    exit()
+    try:
+        num = input("\nWhich server would you like to connect to [" +
+                    str(default_num) + "]? ")
+        if not num:
+            num = int(default_num)
+            break
+        ok = num.isdigit() and 1 <= int(num) <= i
+        if ok:
+            num = int(num)
+            break
+        print("ERR: please enter a value between 1 and " + str(i))
+    except (EOFError, KeyboardInterrupt) as e:
+        print("\nExiting...")
+        exit()
 
 with open(cache_file_num, 'w') as f:
-  f.write(str(num))
+    f.write(str(num))
 
 instance = all_instances[num - 1]
 dns = [
-        instance.get('PublicDnsName', False) or instance.get('PublicIpAddress', False) or instance.get('PrivateDnsName', False) or instance.get('PrivateIpAddress', False), 
-        instance.get('PublicIpAddress', False) or instance.get('PrivateIpAddress', False)
-    ][options.ip]
+    instance.get('PublicDnsName', False) or instance.get('PublicIpAddress', False) or instance.get(
+        'PrivateDnsName', False) or instance.get('PrivateIpAddress', False),
+    instance.get('PublicIpAddress', False) or instance.get(
+        'PrivateIpAddress', False)
+][options.ip]
 key = instance['KeyName'] if 'KeyName' in instance else ''
 
 identity = ''
 if options.identity and os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh', options.identity)):
-  identity = "%s" % options.identity
+    identity = "%s" % options.identity
 elif (len(key)):
-  identity = "%s.pem" % key 
+    identity = "%s.pem" % key
 
 identities = []
 cache_file_identity = os.path.join(cache_dir, 'ssh2_identity_' + dns)
 default_identity = identity or 'production.pem'
 if os.path.exists(cache_file_identity):
-  default_identity = open(cache_file_identity).read()
+    default_identity = open(cache_file_identity).read()
 print("\nKeys list:\n")
 # Determine which identity to use
 j = 1
 directory = os.path.join(os.path.expanduser('~'), '.ssh')
 for filename in os.listdir(directory):
-  try:
-    contents = open(os.path.join(directory, filename)).read()
-    if "-----BEGIN RSA PRIVATE KEY-----" in contents:
-        index = '[%s]' % j
-        escape = '\033[38;5;%im\033[48;5;%im' % (0,(192 + (j*6)%36) % 255)
-        print('%s%-4s %-127s\033[0m' % (escape, index, filename))
-        identities.append(filename)
-        j += 1
-  except:
-    pass
+    try:
+        contents = open(os.path.join(directory, filename)).read()
+        if "-----BEGIN RSA PRIVATE KEY-----" in contents:
+            index = '[%s]' % j
+            escape = '\033[38;5;%im\033[48;5;%im' % (
+                0, (192 + (j*6) % 36) % 255)
+            print('%s%-4s %-127s\033[0m' % (escape, index, filename))
+            identities.append(filename)
+            j += 1
+    except:
+        pass
 
 ok = False
 while not ok:
-  try:
-    num = input("\nWhich identity would you like to connect with [" + str(default_identity) + "]? ")
-    if not num:
-      identity = '-i ~/.ssh/' + default_identity
-      break
-    ok = num.isdigit() and 1 <= int(num) <= j
-    if ok:
-      identity = '-i ~/.ssh/' + identities[int(num)-1]
-      break
-    print("ERR: please enter a value between 1 and " + str(i))
-  except (EOFError, KeyboardInterrupt) as e:
-    print("\nExiting...")
-    exit()
+    try:
+        num = input(
+            "\nWhich identity would you like to connect with [" + str(default_identity) + "]? ")
+        if not num:
+            identity = '-i ~/.ssh/' + default_identity
+            break
+        ok = num.isdigit() and 1 <= int(num) <= j
+        if ok:
+            identity = '-i ~/.ssh/' + identities[int(num)-1]
+            break
+        print("ERR: please enter a value between 1 and " + str(i))
+    except (EOFError, KeyboardInterrupt) as e:
+        print("\nExiting...")
+        exit()
 
 with open(cache_file_identity, 'w') as f:
-  f.write(str(identity)[10:])
+    f.write(str(identity)[10:])
 
 print(options.user)
 cache_file_user = os.path.join(cache_dir, 'ssh2_user_' + dns)
 default_user = 'ubuntu'
 if os.path.exists(cache_file_user):
-  default_user = open(cache_file_user).read()
+    default_user = open(cache_file_user).read()
 ok = not not default_user
 while not ok or not options.user:
-  try:
-    options.user = input("Which username would you like to connect with [" +
-            str(default_user) + "]? ")
-    if not options.user:
-      options.user = default_user
-      break
-    ok = not not options.user
-    if ok:
-      break
-  except (EOFError, KeyboardInterrupt) as e:
-    print("\nExiting...")
-    exit()
+    try:
+        options.user = input("Which username would you like to connect with [" +
+                             str(default_user) + "]? ")
+        if not options.user:
+            options.user = default_user
+            break
+        ok = not not options.user
+        if ok:
+            break
+    except (EOFError, KeyboardInterrupt) as e:
+        print("\nExiting...")
+        exit()
 with open(cache_file_user, 'w') as f:
-  f.write(str(options.user))
+    f.write(str(options.user))
 
 # Generate ssh helper files
 
@@ -255,21 +277,23 @@ if identity:
     disablePublic = ' -o IdentitiesOnly=yes -o ForwardAgent=yes -o HostKeyAlgorithms=ssh-rsa-cert-v01@openssh.com,ssh-rsa '
 
 ssh_connect = 'ssh -K %s%s%s@%s' % (identity, disablePublic, options.user, dns)
-print("\nConnecting to", extract_name(instance), 'using: \n' + ssh_connect + '\n')
+print("\nConnecting to", extract_name(instance),
+      'using: \n' + ssh_connect + '\n')
 
 # Attempt to connect
 try:
-  code = 0
-  output = subprocess.check_output(ssh_connect + " exit", shell=True)
+    code = 0
+    output = subprocess.check_output(ssh_connect + " exit", shell=True)
 except (subprocess.CalledProcessError) as e:
-  code = e.returncode
+    code = e.returncode
 
 # If connected, add ssh2 helper files
 if code == 0:
-    # Add key 
+    # Add key
     os.system('ssh-add ' + identity[3:] + ' > /dev/null 2>&1')
     # Add ssh2 sibling file to hop to linked machines
-    os.system('scp %s %s %s %s@%s:~/ssh2 > /dev/null 2>&1' % (disablePublic, identity, scp_ssh2, options.user, dns))
+    os.system('scp %s %s %s %s@%s:~/ssh2 > /dev/null 2>&1' %
+              (disablePublic, identity, scp_ssh2, options.user, dns))
     # Add $HOME to $PATH & update file permissions
     os.system(ssh_connect + " 'grep -q -F \"export PATH=\\\"$PATH:$HOME\\\"\" \"$HOME/.profile\" || echo \"export PATH=\\\"$PATH:$HOME\\\"\"  >>  \"$HOME/.profile\"; chmod 744 ~/ssh2' > /dev/null 2>&1")
 
