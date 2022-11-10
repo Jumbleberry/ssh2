@@ -184,7 +184,7 @@ directory = os.path.join(os.path.expanduser('~'), '.ssh')
 for filename in os.listdir(directory):
     try:
         contents = open(os.path.join(directory, filename)).read()
-        if "-----BEGIN RSA PRIVATE KEY-----" in contents:
+        if "-----BEGIN RSA PRIVATE KEY-----" in contents or "-----BEGIN OPENSSH PRIVATE KEY-----" in contents:
             index = '[%s]' % j
             escape = '\033[38;5;%im\033[48;5;%im' % (
                 0, (192 + (j*6) % 36) % 255)
