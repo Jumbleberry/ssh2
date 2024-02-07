@@ -274,7 +274,7 @@ with open(scp_ssh2, 'w') as f:
 
 disablePublic = ''
 if identity:
-    disablePublic = ' -o IdentitiesOnly=yes -o ForwardAgent=yes -o HostKeyAlgorithms=ssh-rsa-cert-v01@openssh.com,ssh-rsa '
+    disablePublic = ' -o IdentitiesOnly=yes -o ForwardAgent=yes -o HostKeyAlgorithms=ssh-rsa-cert-v01@openssh.com,ssh-rsa,ssh-ed25519 '
 
 ssh_connect = 'ssh -K %s%s%s@%s' % (identity, disablePublic, options.user, dns)
 print("\nConnecting to", extract_name(instance),
